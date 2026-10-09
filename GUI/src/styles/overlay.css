@@ -1,0 +1,98 @@
+.overlay {
+	position: fixed;
+	top: 8px;
+	left: 18px;
+	z-index: 2;
+	min-width: 15vw;
+	padding: 12px;
+	border-radius: 10px;
+	background-color: rgba(70, 70, 70, 0.75);
+	backdrop-filter: blur(8px);
+	color: white;
+	font-size: 0.875rem;
+	user-select: none;
+}
+
+.overlay.collapsed {
+	min-width: 0;
+	padding: 6px;
+}
+
+.overlay header {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.overlay .title {
+	font-weight: 600;
+	letter-spacing: 0.02em;
+}
+
+.overlay .body {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	padding-top: 12px;
+}
+
+.overlay .icon {
+	display: grid;
+	place-items: center;
+	width: 28px;
+	height: 28px;
+	padding: 0;
+	border: none;
+	border-radius: 6px;
+	background: rgba(255, 255, 255, 0.08);
+	color: inherit;
+	cursor: pointer;
+	transition: background 120ms;
+}
+.overlay .icon:hover {
+	background: rgba(255, 255, 255, 0.18);
+}
+.overlay .icon svg {
+	width: 16px;
+	height: 16px;
+	fill: none;
+	stroke: currentColor;
+	stroke-width: 2.5;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+}
+
+.overlay .toggle svg {
+	transition: transform 150ms;
+}
+.overlay.collapsed .toggle svg {
+	transform: rotate(-90deg);
+}
+
+.overlay .nav {
+	display: flex;
+	gap: 6px;
+}
+.overlay .nav .icon {
+	flex: 1;
+}
+
+.overlay label {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+}
+.overlay label span {
+	display: flex;
+	justify-content: space-between;
+	opacity: 0.85;
+}
+.overlay output {
+	font-variant-numeric: tabular-nums;
+	opacity: 0.7;
+}
+.overlay input[type="range"] {
+	width: 100%;
+	accent-color: white;
+}
