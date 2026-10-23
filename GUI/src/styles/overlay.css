@@ -37,6 +37,26 @@
 	padding-top: 12px;
 }
 
+.overlay .status {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	font-size: 0.8rem;
+	opacity: 0.9;
+}
+
+.overlay .status .dot {
+	width: 8px;
+	height: 8px;
+	border-radius: 50%;
+	background: #4caf50;
+	flex: none;
+}
+
+.overlay .status .dot.off {
+	background: #f44336;
+}
+
 .overlay .icon {
 	display: grid;
 	place-items: center;

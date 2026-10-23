@@ -3,6 +3,10 @@ from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from typing import cast
 import cv2 as cv
+import numpy as np
+import time
+from pathlib import Path
+import threading
 
 #Just a small setup for the face tracker, probably will have to change a lot to be able to implement it into the project
 
@@ -12,6 +16,10 @@ FaceDetectorOptions = mp.tasks.vision.FaceDetectorOptions
 FaceDetectorResult = mp.tasks.vision.FaceDetectorResult
 VisionRunningMode = mp.tasks.vision.RunningMode
 LatestResult = None
+MODEL_PATH = Path(__file__).resolve().with_name('blaze_face_short_range.tflite')
+
+def thread_function(options):
+    with FaceDetector.create_from_options(options) as detector:
 
         cap = cv.VideoCapture(0)
 
@@ -23,6 +31,10 @@ LatestResult = None
             exit()
         while cap.isOpened():
 
+            ret, frame = cap.read()
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+                break
 
             rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
@@ -36,6 +48,10 @@ LatestResult = None
                     cv.rectangle(frame, (bbox.origin_x, bbox.origin_y),
                                 (bbox.origin_x + bbox.width, bbox.origin_y + bbox.height),
                                 (0, 255, 0), 2, 16)
+                    for kp in detection.keypoints:
+                        cv.circle(frame, (int(kp.x * w), int(kp.y * h)), 4, (0, 0, 255), -1)
+            '''
+
             frame = cv.flip(frame, 1)
 
             out.write(frame)

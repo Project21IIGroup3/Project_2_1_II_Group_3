@@ -1,12 +1,17 @@
 * {
-	padding: 0px; 
+	padding: 0px;
 	margin: 0px;
 }
 
 .container {
 	min-width: 100vw;
 	min-height: 100vh;
-	background-color: rgba(170, 170, 170, 1)
+	background-color: rgba(170, 170, 170, 1);
+	overflow: hidden;
 }
 
-
+.scene {
+	width: 100%;
+	height: 100%;
+	will-change: transform;
+}
