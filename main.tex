@@ -1,45 +1,518 @@
-\documentclass[12pt]{article}
-\usepackage[utf8]{inputenc}
-\usepackage[T1]{fontenc}
-\usepackage{geometry}
-\geometry{margin=1in}
+\documentclass[11pt,a4paper]{article}
+\usepackage[margin=2.2cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{float}
 \usepackage{enumitem}
-\usepackage{hyperref}
-\hypersetup{colorlinks=true, linkcolor=blue, urlcolor=blue}
+\usepackage{microtype}
+\usepackage{tikz}
+\usepackage{adjustbox}
+\usetikzlibrary{positioning,arrows.meta,shapes.geometric}
+\usepackage[colorlinks=true,linkcolor=black,urlcolor=blue]{hyperref}
 
-\title{Literature Search Methods Report: Artificial Intelligence in Mental Health Care}
-\author{}
-\date{}
+\newcolumntype{L}{>{\raggedright\arraybackslash}X}
+
+% - Gantt chart helpers (plain TikZ, see Section 5) -
+\tikzset{
+  gann/.style={font=\footnotesize},
+  gbar/.style={draw=black!60, line width=0.3pt, rounded corners=0.8pt},
+}
+\newcounter{growrow}
+\newcommand{\gtask}[4]{% start col, end col, color, label
+  \node[gann, anchor=east] at (-0.5, {\value{growrow}+0.5}) {#4};%
+  \fill[#3, gbar] ({#1-0.78}, {\value{growrow}+0.18}) rectangle ({#2-0.22}, {\value{growrow}+0.82});%
+  \stepcounter{growrow}}
+\newcommand{\gmile}[2]{% column, label
+  \node[gann, anchor=east] at (-0.5, {\value{growrow}+0.5}) {#2};%
+  \node[diamond, fill=red!65, draw=black!60, line width=0.3pt, inner sep=1.2pt]%
+    at ({#1-0.5}, {\value{growrow}+0.5}) {};%
+  \stepcounter{growrow}}
+\newcommand{\ggroup}[1]{% phase header row
+  \fill[black!6] (0,\value{growrow}) rectangle (21,{\value{growrow}+1});%
+  \node[gann, font=\footnotesize\bfseries, anchor=west] at (0.15, {\value{growrow}+0.5}) {#1};%
+  \stepcounter{growrow}}
+
+\title{\vspace{-1.2cm}Project Plan\\[1.5mm]
+\large Pralax - an Eye-Tracked Parallax Viewer}
+\author{Group 3 - Project 2.1\\
+Maksymilian Zalewski (6444754), Justin Abel (6434415)\\ Rotem Aharoni (6442833), Ginguta Tudor Dan (6442826)\\ Federico D'Agata (6445526), Sotiris Andronikos Mitsopoulos (6344396)\\[1.5mm]
+Tutor: Vasileios Tzatziou}
+\date{October 9, 2026}
 
 \begin{document}
+
 \maketitle
+\vspace{-8mm}
 
-\section{Introduction and Research Question}
+\section{Introduction}
+\label{sec:intro}
 
-Artificial intelligence (AI) has rapidly become a transformative force in healthcare, with mental health care representing one of the most promising and complex application domains. Recent systematic reviews have documented AI applications across diagnosis, monitoring, and intervention, including machine learning models for detecting depression, natural language processing for suicide risk prediction, and chatbots for therapeutic support. However, the field remains fragmented across disciplines, and methodological quality varies. To professionalize the search methods for this project, this report documents the literature search conducted to identify studies on AI in mental health care.
+Pralax is a desktop application that brings 2D artwork and 3D scenes to life. The way it works is by taking the content on screen and having it respond to the viewer's eye position, creating a parallax effect - as if looking through a window into the scene. The application is
+implemented as a Tauri desktop app (Rust shell, SvelteKit + TypeScript frontend).
+It currently offers one mode, parallaxed 2D artworks rendered as depth layers;
+if time allows, we will add two further modes:
+(\textit{i}) 3D scenes created in Blender, and
+(\textit{ii}) user-uploaded images projected into a parallax view.
+The eye tracking is performed with a regular webcam, so no dedicated hardware is
+required.
 
-The overall project investigates how AI is used in mental health care, with a particular focus on three domains: diagnosis, monitoring, and intervention. The search was designed to be reproducible, transparent, and critically evaluated. It moves beyond the first-year focus on constructing a search strategy by justifying database choices, documenting iterative refinements, and assessing search quality. The following research questions guide the review:
+This document presents the results of the first project phase: the envisioned
+software architecture (Section~\ref{sec:arch}), a comparison of the software
+components we tested and the approaches we considered, including the performed
+tests and the selection criteria (Section~\ref{sec:tests}), the task planning
+for the second and third phases with responsibilities
+(Section~\ref{sec:planning}), a Gantt chart of the main tasks
+(Section~\ref{sec:gantt}), and a risk analysis (Section~\ref{sec:risks}).
 
-\begin{itemize}
-    \item \textbf{Primary research question:} How is AI used in diagnosing mental health illnesses, monitoring disease progression and treatment effectiveness, and conducting AI-assisted mental health interventions?
-    \item \textbf{Secondary research question:} What are the limitations, challenges, and ethical concerns in the application of AI technologies in mental health?
+\section{Software Architecture}
+\label{sec:arch}
+
+Figure~\ref{fig:arch} shows the target architecture as an annotated block
+diagram. Green boxes mark components that already exist as phase-1
+prototypes, blue boxes are built in phases~2 and~3, and grey boxes are
+hardware.
+
+\noindent\textbf{Data flow.} The webcam frames are used by a Python
+sidecar process running MediaPipe Face Mesh. The module estimates the viewer's
+face/eye position, applies the calibration and exponential smoothing, and publishes
+a normalized eye position $(x,y)$ as JSON events to the front-end. The Rust
+Tauri shell manages the sidecar lifecycle and exposes a \emph{localhost-only}
+IPC bridge, which keeps the tracking data inside the machine (no network
+exposure); the messages are small (two coordinates and a timestamp), so JSON
+encoding adds latency, but it is so small that it is negligible. The SvelteKit UI receives the
+events and passes the position, together with the user settings
+(intensity, depth, smoothing - the parameters already prototyped in the
+phase-1 overlay), to the parallax engine. The engine renders either a 3D scene
+(glTF assets exported from Blender, rendered with Three.js and a camera offset
+proportional to the eye position) or a 2.5D artwork (HTML/CSS depth layers that
+move at different rates). Scene components are loaded lazily so that modes can
+be added without restarting the app.
+
+\noindent\textbf{Status after phase~1.} The eye-tracking controller API
+(Tudor), the Tauri window system with lazy loading and the settings overlay
+(Federico), the first Blender scene (Justin, Rotem) and the face-to-parallax
+mapping prototype (Sotiris) already exist; we also researched the build
+system and CI/CD set-up. The IPC bridge, the mode selection UI, the parallax
+engine, the CI pipeline and the asset pipeline are built in phase~2
+(Section~\ref{sec:planning}).
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=4mm and 6mm,
+  base/.style={draw=black!70, rounded corners=2pt, align=left, font=\footnotesize, inner sep=3pt},
+  new/.style={base, fill=blue!8, text width=86mm},
+  done/.style={base, fill=green!12, text width=86mm},
+  side/.style={base, text width=50mm},
+  hw/.style={base, fill=black!6, text width=86mm, align=center},
+  arr/.style={-stealth, semithick},
+]
+\node[hw] (cam) {\textbf{Webcam} (built-in or USB, $640\times480$ @ 30\,FPS)};
+\node[done, below=of cam] (eye) {\textbf{Eye-Tracking Module} (Python sidecar)\\
+  MediaPipe face tracking in a threaded camera loop\\
+  calibration + EMA smoothing\\
+  $\to$ normalised eye position $(x,y)$, target $\geq 30$\,FPS};
+\node[new, below=of eye] (rust) {\textbf{Tauri Shell} (Rust)\\
+  sidecar lifecycle, localhost-only IPC bridge, settings persistence, webcam/OS permissions};
+\node[new, below=of rust] (ui) {\textbf{SvelteKit UI} (TypeScript)\\
+  settings overlay (intensity/depth/smoothing), lazy scene loader\\
+  mode selection, calibration wizard};
+\node[new, below=of ui] (eng) {\textbf{Parallax Engine} (webview)\\
+  3D: Three.js renders Blender glTF scenes, camera offset\\
+  2.5D: HTML/CSS depth layers; target $\geq 60$\,FPS};
+\node[hw, below=of eng] (disp) {\textbf{Display} (desktop window)};
+
+\draw[arr] (cam) -- (eye);
+\draw[arr] (eye) -- (rust);
+\draw[arr] (rust) -- (ui);
+\draw[arr] (ui) -- (eng);
+\draw[arr] (eng) -- (disp);
+
+\node[side, fill=green!12, right=of eng] (assets) {\textbf{Scene Assets}\\
+  Blender glTF exports\\
+  layered artworks (SVG/PNG)\\
+  user-uploaded images (JPG/PNG)};
+\draw[arr] (assets) -- (eng);
+\node[side, fill=blue!8, right=of rust] (tool) {\textbf{Tooling}\\
+  GitHub Actions CI (build + test)\\
+  latency logs (CSV), config files};
+\draw[arr, dashed] (tool) -- (rust);
+\end{tikzpicture}
+\caption{Annotated block diagram of the envisioned software architecture.
+Green: phase-1 prototype exists; blue: built in phases~2--3; grey: hardware.
+Solid arrows show the run-time data flow, the dashed arrow shows build and
+test tooling.}
+\label{fig:arch}
+\end{figure}
+
+\section{Software Component Tests and Comparison}
+\label{sec:tests}
+
+\subsection{Evaluation criteria and test methodology}
+
+All candidate components were evaluated against the same five criteria:
+\begin{itemize}[leftmargin=*,itemsep=1pt,topsep=2pt]
+\item \textbf{C1 - Responsiveness:} frame rate and end-to-end latency
+(camera to screen), because a laggy parallax effect is immediately
+perceived as broken.
+\item \textbf{C2 - Accuracy and robustness:} correct detection under
+realistic conditions (glasses, varying lighting, head movement), which
+determines how many users can actually use the app.
+\item \textbf{C3 - Integration effort:} how easily the component connects
+to our chosen stack (Tauri webview, SvelteKit/TypeScript, Python sidecar),
+including data formats and licensing friction.
+\item \textbf{C4 - Resource usage:} CPU/GPU load, since tracking and scene
+rendering must run concurrently on consumer hardware.
+\item \textbf{C5 - Maintainability:} documentation, community activity,
+permissive licensing and the team's familiarity with the technology.
 \end{itemize}
 
-These questions were formulated to capture both the practical applications of AI in mental health care and the critical considerations surrounding their deployment. The search therefore needed to cover clinical, psychological, and technical literature, and to balance sensitivity with precision across multiple databases.
+\noindent\textbf{Test setup.} Measurements were taken on the group's
+development laptops with a $640\times480$ webcam at 30\,FPS. Each run captured
+60\,s of video; the camera-loop frame rate and the per-frame detection latency
+were measured with timestamps. Robustness was assessed qualitatively on the
+team members (with and without glasses, different rooms and lighting).
 
-\section{Databases and Search Platforms}
+\subsection{Eye tracking}
 
-\section{Search Strategy Development}
+Two eye-tracking implementations were built and tested in phase~1.
 
-\section{Final Search Strategies}
+\begin{enumerate}[itemsep=2pt,topsep=2pt]
+\item \textbf{MediaPipe Face Mesh (Python).} MediaPipe is Google's
+open-source framework for on-device perception. It ships pre-trained machine
+learning models (\texttt{.tflite}) and exposes a Python API; its face pipeline
+first locates the face with the BlazeFace short-range detector and then fits
+a 468-point face mesh that includes the eye landmarks. We built a threaded
+camera loop using the \texttt{LIVE\_STREAM} running mode with an asynchronous
+result callback, so detection runs concurrently with the GUI.
+\item \textbf{OpenCV (C++).} OpenCV is the standard open-source computer
+vision library; we built a C++ demo using its pre-trained Haar cascade-based face
+detector. The fact that it was written in C++, led us to expect that it would offer a speed advantage over MediaPipe Face Mesh.
+\end{enumerate}
 
-\section{PRISMA-S Flow Diagram}
-\section{Critical Evaluation of the Search}
+\begin{table}[H]
+\centering
+\caption{Speed comparison of the tested face-tracking components.}
+\label{tab:speed}
+\begin{tabular}{lcc}
+\toprule
+\textbf{Metric} & \textbf{MediaPipe (Python)} & \textbf{OpenCV (C++)} \\
+\midrule
+Camera loop rate          & 29.1\,FPS & 29.8\,FPS \\
+Detection rate            & 29.1\,FPS & 29.8\,FPS \\
+Average detection latency & 2.3\,ms   & 2.1\,ms  \\
+\bottomrule
+\end{tabular}
+\end{table}
 
-\section{Conclusion}
+\noindent\textbf{Results.} As Table~\ref{tab:speed} shows, both libraries
+performed nearly identically: the 30\,FPS webcam is the bottleneck, and both
+detectors saturate it. The OpenCV demo was marginally faster ($+0.7$\,FPS,
+$-0.2$\,ms), but the qualitative robustness test revealed a decisive
+difference: when the user wore glasses, the OpenCV demo detected the face and
+eyes only intermittently - from time to time it found something, while
+without glasses the detection was more or less instant. MediaPipe kept
+detecting reliably in both cases. Since the speed advantage was negligible, we
+saw no benefit in spending time calibrating the C++ library to reach
+MediaPipe's robustness.
+We therefore \textbf{select MediaPipe Face Mesh (Python)} for the eye-tracking
+module. It additionally provides 468 facial landmarks, including eye
+landmarks, which allow us to refine the eye-position estimate in later phases,
+and it integrates directly with the phase-1 controller API (C3, C5).
 
-\section*{Refrences}
-% To be completed: Structured reference list of discovered relevant literature.
-% Consider using EndNote or Zotero for reference management.
+\noindent\textbf{Considered but not selected.} Dedicated hardware eye trackers
+(e.g.\ Tobii) were rejected because they add cost and hardware dependencies,
+contradicting the requirement to work with a regular webcam (C3, C4).
+Learned gaze-estimation models (L2CS-Net, GazeML) were rejected as unnecessarily
+heavy: for a screen-relative parallax effect, the face/eye position suffices,
+and the extra latency of a deep gaze model does not buy accuracy we can use
+(C1, C4). Dlib's HOG-based detector was considered but not tested further
+after MediaPipe's results: it is slower on CPU and less robust than MediaPipe
+(C1, C2).
+
+\subsection{3D scene visualisation}
+
+\begin{itemize}[leftmargin=*,itemsep=1pt,topsep=2pt]
+\item \textbf{Approach A - Blender-authored scenes rendered with Three.js
+(WebGL) in the webview.} Scenes are authored in Blender (free, large community,
+familiar to the artists in the team) and exported as glTF, then rendered with
+Three.js. WebGL runs inside the Tauri webview on all three desktop platforms,
+and the perspective camera gives full control over the parallax offset.
+\item \textbf{Approach B - Babylon.js.} A full 3D game engine in TypeScript
+with a richer feature set (PBR, physics, editor). Its added capabilities are
+largely unnecessary for static scenes, and it adds bundle size and learning
+cost (C4, C5).
+\item \textbf{Approach C - CSS 3D transforms.} Pure CSS perspective is
+lightweight, but it cannot import scene formats, has no lighting model and
+becomes unwieldy for organic scenes (C1, C3).
+\item \textbf{Approach D - 2.5D layered artworks (HTML/CSS).} Artwork is
+split into depth layers that move at different rates; no GPU work is needed
+at all. We prototyped this style in phase~1 with placeholder SVG scenes
+(Mona Lisa, Starry Night) and it matches the intensity/depth/smoothing
+settings overlay.
+\end{itemize}
+
+\noindent\textbf{Tests performed.} In phase~1 we validated (i) the Tauri +
+SvelteKit window system with lazy scene loading and a controls overlay
+(Federico), and (ii) the asset pipeline by authoring a first 3D scene in
+Blender (Justin, Rotem) - which also exposed the export issues (camera
+placement, colours) that we address in phase~2. We additionally
+researched webview-based rendering with HTML/CSS instead of a GPU-rendered
+library and confirmed both are feasible inside Tauri.
+
+\noindent\textbf{Decision.} We \textbf{select Approach A} (Blender + Three.js)
+for the 3D scenes, and \textbf{keep Approach D} for the artwork and
+user-uploaded-image modes, since it needs no GPU and reuses the tested
+settings overlay. Babylon.js (B) is overkill and CSS 3D (C) is too limited.
+This hybrid covers all three modes with minimal risk.
+
+\subsection{Parallax effect}
+
+\begin{itemize}[leftmargin=*,itemsep=1pt,topsep=2pt]
+\item \textbf{Approach A - Perspective-camera offset.} The eye position
+translates the 3D camera while the scene stays fixed, producing true parallax
+with correct occlusion. Naturally compatible with the Three.js renderer.
+\item \textbf{Approach B - Layered displacement (2.5D).} Each depth layer
+moves proportionally to the eye position divided by its depth. Very cheap,
+works for artwork and photos, and its tuning knobs (intensity, depth,
+smoothing) already exist in our overlay.
+\item \textbf{Approach C - Head-coupled off-axis projection.} The frustum is
+recomputed from the physical screen geometry and the eye's position in front
+of it (Johnny-Lee/TrackIR style). The most physically correct option, but it
+requires precise head-position tracking and per-setup calibration; kept as a
+phase-3 stretch goal if time allows.
+\item \textbf{Approach D - Shader-based parallax (parallax occlusion
+mapping).} Fakes depth inside a texture; limited to surface detail and
+unsuitable for real scenes. Rejected.
+\end{itemize}
+
+\noindent\textbf{Tests performed.} We built a face-to-parallax
+mapping prototype in phase~1: the face-tracking output moves the parallax
+effect relative to a reference point, so that looking at a different screen
+area changes the view. It works end to end but still needs performance work
+(the mapping currently runs in the same loop as detection). The
+intensity/depth/smoothing overlay (Federico) provides the parameter interface
+for approach B and was tested interactively in the GUI.
+
+\noindent\textbf{Decision.} We \textbf{select a hybrid of A and B}: camera
+offset for the 3D scenes and layered displacement for artworks and uploaded
+images, with EMA smoothing to suppress tracking jitter. Both are cheap
+(C4), instantly responsive (C1), and built on components already tested in
+phase~1.
+
+\subsection{Application shell}
+
+We compared three ways to package the application. \textbf{Electron}
+bundles its own Chromium and Node.js runtime, which makes installers large and
+raises memory use (C4). A \textbf{native desktop toolkit} (e.g.\ Qt/C++) would
+give full control but cannot reuse web rendering libraries such as Three.js and
+increases the implementation effort (C3). \textbf{Tauri} uses the operating
+system's webview with a small Rust core, supports bundling the Python tracker
+as a sidecar process, and was validated in phase~1 with the window system,
+lazy loading and settings overlay. We therefore \textbf{select Tauri with a
+SvelteKit + TypeScript frontend} (C3, C4, C5).
+
+\subsection{Selection summary}
+
+\begin{table}[H]
+\centering
+\caption{Summary of the component selection per domain.}
+\label{tab:selection}
+\begin{tabularx}{\textwidth}{lLLL}
+\toprule
+\textbf{Domain} & \textbf{Considered} & \textbf{Selected} & \textbf{Deciding criteria} \\
+\midrule
+Eye tracking & OpenCV (C++), Tobii hardware, gaze models (L2CS/GazeML), Dlib & MediaPipe Face Mesh (Python) & C2 (glasses), C1 parity, C3/C5 (Python API, landmarks) \\
+3D scene visualisation & Three.js (Blender glTF), Babylon.js, CSS 3D, 2.5D HTML/CSS layers & Three.js for 3D scenes + layered 2.5D for artworks & C3/C4/C5; both paths tested in phase 1 \\
+Parallax effect & Camera offset, layer displacement, head-coupled frustum, POM shaders & Hybrid: camera offset + layer displacement with EMA smoothing & C1 latency, C4 cost, reuses tested overlay \\
+Application shell & Electron, native desktop, Tauri & Tauri + SvelteKit + TypeScript & C4/C5, tested window system \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Planned Tasks for Phases 2 and 3}
+\label{sec:planning}
+
+All tasks below are SMART: \textbf{Specific} (each names a concrete
+deliverable), \textbf{Measurable} (each has a numeric acceptance criterion),
+\textbf{Achievable} (assigned to members who already built the corresponding
+phase-1 component), \textbf{Realistic} (windows are sized from the recorded
+phase-1 effort and the agreed split: Federico 20\%, Tudor 20\%, Sotiris 20\%,
+Justin 15\%, Rotem 15\%, Max 10\% of coding; Max also leads project
+management and the user study), and \textbf{Timely} (fixed windows, reviewed
+at the weekly project meeting, feeding milestones Oct~11, Nov~28, Jan~30).
+Tudor co-manages the project. The T2.13 harness logs all measurements so that
+every experiment is reproducible from a config file.
+
+\noindent\textbf{Milestone M1 (Oct 11):} this project plan and the
+8-minute demo video (mp4, $\leq$300\,MB) of the tested components,
+submitted to the examiners.
+
+\begin{table}[H]
+\centering
+\caption{Phase 2 - Core implementation (Oct 12 - Nov 28, 2026).}
+\label{tab:p2}
+\footnotesize
+\renewcommand{\arraystretch}{1.05}
+\begin{tabularx}{\textwidth}{@{}l >{\raggedright\arraybackslash}p{38mm} >{\raggedright\arraybackslash}p{21mm} >{\raggedright\arraybackslash}p{20mm} L@{}}
+\toprule
+\textbf{ID} & \textbf{Task} & \textbf{Owner(s)} & \textbf{Window} & \textbf{Acceptance criterion} \\
+\midrule
+T2.1 & Python $\leftrightarrow$ Tauri bridge for tracking data & Federico, Tudor & Oct 12-25 & $\geq$30\,Hz eye-position events, $\leq$5\,ms latency, localhost-only \\
+T2.2 & Render parallax with the Blender scenes in Tauri & Federico & Oct 12-Nov 8 & Scenes render at $\geq$60\,FPS; camera offset follows eye position \\
+T2.3 & Fix 3D model issues: camera placement, colours, broken parts & Justin, Rotem & Oct 12-25 & Asset checklist passed for every scene \\
+T2.4 & UI for mode selection (HTML/TypeScript) & Rotem & Oct 12-Nov 1 & All modes switchable without reload; settings apply live \\
+T2.5 & Tracking performance optimisation & Sotiris, Tudor & Oct 19-Nov 8 & Sustained $\geq$30\,FPS; end-to-end latency $\leq$50\,ms \\
+T2.6 & Calibration + sensitivity settings & Justin, Sotiris & Oct 26-Nov 15 & Calibration $\leq$1\,min; profile persists; sliders affect rendering \\
+T2.7 & Extra scenes: artwork parallax + more 3D scenes & Justin, Rotem & Oct 26-Nov 22 & $\geq$3 artwork scenes and $\geq$2 3D scenes of different complexity \\
+T2.8 & User-uploaded image mode & Federico, Rotem & Nov 2-22 & JPG/PNG import with depth layering, processing $\leq$2\,s \\
+T2.9 & CI pipeline (build + test on commit) & Sotiris & Oct 12-25 & GitHub Actions builds and tests every commit \\
+T2.10 & Eye-tracking accuracy improvements & Tudor, Max & Nov 2-22 & Robust with and without glasses; jitter $\leq$1\% of screen width \\
+T2.11 & Phase-2 live demo preparation & Max, Tudor & Nov 16-28 & 20-min demo rehearsed twice; examiners can try the app themselves \\
+T2.12 & Peer-feedback session + feedback form & Rotem & Nov 9-22 & Form ready; feedback from 2 groups collected and filed as GitHub issues \\
+T2.13 & Performance measurement harness & Sotiris & Oct 26-Nov 15 & Per-stage timestamps (capture, detection, IPC, render) logged to CSV; runs driven by config files \\
+T2.14 & User-study preparation & Justin, Max & Nov 9-28 & Protocol, consent form and questionnaire done; 2 pilot runs; participants scheduled \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\vspace{-2mm}
+\noindent\textbf{Milestone M2 (Nov 28):} end-to-end working prototype - eye
+movement visibly drives the parallax effect in all three modes.
+
+\begin{table}[H]
+\centering
+\caption{Phase 3 - Testing, polish and delivery (Nov 30, 2026 - Jan 30, 2027).}
+\label{tab:p3}
+\footnotesize
+\renewcommand{\arraystretch}{1.05}
+\begin{tabularx}{\textwidth}{@{}l >{\raggedright\arraybackslash}p{38mm} >{\raggedright\arraybackslash}p{21mm} >{\raggedright\arraybackslash}p{20mm} L@{}}
+\toprule
+\textbf{ID} & \textbf{Task} & \textbf{Owner(s)} & \textbf{Window} & \textbf{Acceptance criterion} \\
+\midrule
+T3.1 & User study: run sessions and analyse results & Justin, Max & Nov 30-Dec 19 & $\geq$10 participants; parallax on/off and scenes of different complexity compared; statistical analysis with plots \\
+T3.2 & Performance experiments + optimisation & Sotiris, Tudor & Nov 30-Dec 19 & Scene complexity increased until real time breaks; latency histograms and per-component breakdown; $\geq$30\,FPS end to end \\
+T3.3 & UI/UX polish & Federico, Rotem & Nov 30-Dec 19 & All high-priority examiner, peer and user-study feedback resolved \\
+T3.4 & Browser demo for examiners & Sotiris & Dec 7-19 & Public URL live with browser-based tracking or mouse fallback; offline build available \\
+- & Christmas break & all & Dec 20-Jan 3 & - \\
+T3.5 & Bug fixing + code freeze & Federico, Sotiris & Jan 4-17 & Zero known critical bugs; release tagged on GitHub \\
+T3.6 & Final report ($\leq$10 pages) & Max, Justin & Jan 4-24 & Draft reviewed by all members by Jan 17; submitted on time \\
+T3.7 & Final presentation + demo prep & Rotem, Tudor & Jan 11-30 & 5-min talk and live demo rehearsed twice; backup plan ready \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\vspace{-2mm}
+\noindent\textbf{Milestone M3 (Jan 30):} final report and product
+examination.
+
+\section{Gantt Chart}
+\label{sec:gantt}
+
+Figure~\ref{fig:gantt} shows the timeline of the main tasks; task IDs refer to
+Tables~\ref{tab:p2} and~\ref{tab:p3}. Weeks start on Mondays, and phase~1
+(grey, completed) is included for context.
+
+\begin{figure}[H]
+\centering
+\begin{adjustbox}{max width=\textwidth}
+\begin{tikzpicture}[x=4.7mm, y=-4.45mm]
+\setcounter{growrow}{0}
+% month header
+\foreach \mm/\aa/\bb in {Sep/1/4, Oct/5/8, Nov/9/12, Dec/13/17, Jan/18/21}
+  \node[gann, font=\footnotesize\bfseries] at ({((\aa+\bb)/2)-0.5}, -1.3) {\mm};
+\foreach \x in {4,8,12,17} \draw[black!40] (\x,-1.8) -- (\x,-0.8);
+% day of the week-start Monday
+\foreach \c/\w in {1/7, 2/14, 3/21, 4/28, 5/5, 6/12, 7/19, 8/26, 9/2, 10/9, 11/16, 12/23, 13/30, 14/7, 15/14, 16/21, 17/28, 18/4, 19/11, 20/18, 21/25}
+  \node[gann, text=black!70] at ({\c-0.5}, -0.4) {\w};
+\draw[black!75] (0,0) -- (21,0);
+% grid
+\draw[gray!40, line width=0.25pt] (0,0) grid (21,41);
+
+\ggroup{Phase 1 - Research \& Setup (done)}
+\gtask{1}{1}{gray!45}{Read manual \& syllabus (all)}
+\gtask{1}{1}{gray!45}{Repo + shared folder (Max)}
+\gtask{2}{3}{gray!45}{Brainstorm UX (Jus., Rot.)}
+\gtask{2}{2}{gray!45}{Research eye/face libraries (Tud., Max)}
+\gtask{2}{2}{gray!45}{Research Tauri + webview (Fed.)}
+\gtask{2}{2}{gray!45}{Research CI/CD, parallax maths (Sot.)}
+\gtask{2}{3}{gray!45}{MediaPipe setup (Tud.)}
+\gtask{3}{4}{gray!45}{C++/OpenCV comparison demo (Max)}
+\gtask{4}{5}{gray!45}{Blender scene v1 (Jus., Rot.)}
+\gtask{4}{5}{gray!45}{Window system + overlay (Fed.)}
+\gtask{4}{5}{gray!45}{Face-tracking controller API (Tud.)}
+\gtask{4}{5}{gray!45}{Face-to-parallax mapping (Sot.)}
+\gtask{5}{5}{gray!45}{Project plan + demo video (Max)}
+\gmile{5}{Phase 1 deadline (Oct 11)}
+
+\ggroup{Phase 2 - Core Implementation}
+\gtask{6}{7}{blue!30}{T2.1 Python-Tauri bridge (Fed., Tud.)}
+\gtask{6}{9}{blue!30}{T2.2 Blender scenes + parallax (Fed.)}
+\gtask{6}{7}{blue!30}{T2.3 Fix 3D models (Jus., Rot.)}
+\gtask{6}{8}{blue!30}{T2.4 Mode-selection UI (Rot.)}
+\gtask{7}{9}{blue!30}{T2.5 Tracking performance (Sot., Tud.)}
+\gtask{8}{10}{blue!30}{T2.6 Calibration + sensitivity (Jus., Sot.)}
+\gtask{8}{11}{blue!30}{T2.7 Extra scenes (Jus., Rot.)}
+\gtask{9}{11}{blue!30}{T2.8 Uploaded-image mode (Fed., Rot.)}
+\gtask{6}{7}{blue!30}{T2.9 CI pipeline (Sot.)}
+\gtask{9}{11}{blue!30}{T2.10 Tracking accuracy (Tud., Max)}
+\gtask{11}{12}{blue!30}{T2.11 Phase-2 demo prep (Max, Tud.)}
+\gtask{10}{11}{blue!30}{T2.12 Peer feedback + form (Rot.)}
+\gtask{8}{10}{blue!30}{T2.13 Measurement harness (Sot.)}
+\gtask{10}{12}{blue!30}{T2.14 User-study preparation (Jus., Max)}
+\gmile{12}{Phase 2 deadline (Nov 28)}
+
+\ggroup{Phase 3 - Testing, Polish \& Delivery}
+\gtask{13}{15}{orange!35}{T3.1 User study (Jus., Max)}
+\gtask{13}{15}{orange!35}{T3.2 Performance experiments (Sot., Tud.)}
+\gtask{13}{15}{orange!35}{T3.3 UI/UX polish (Fed., Rot.)}
+\gtask{14}{15}{orange!35}{T3.4 Web hosting (Sot.)}
+\gtask{16}{17}{red!15}{Christmas break}
+\gtask{18}{19}{orange!35}{T3.5 Bug fixing + code freeze (Fed., Sot.)}
+\gtask{18}{20}{orange!35}{T3.6 Final report (Max, Jus.)}
+\gtask{19}{21}{orange!35}{T3.7 Presentation + demo (Rot., Tud.)}
+\gmile{21}{Final deadline (Jan 30)}
+\end{tikzpicture}
+\end{adjustbox}
+\caption{Gantt chart of the main tasks. Grey: phase~1 (completed), blue:
+phase~2, orange: phase~3, red: break, diamonds: milestones. The number above
+each column is the date of the Monday that starts the week.}
+\label{fig:gantt}
+\end{figure}
+
+\clearpage
+\section{Risk Analysis}
+\label{sec:risks}
+
+Table~\ref{tab:risks} lists the ten major risks of the project, their impact
+and likelihood (H/M/L), and the mitigation plans. The risks were identified
+at a group meeting, are reviewed at every weekly project meeting, and are
+addressed by the tasks referenced in the last column.
+
+\begin{table}[H]
+\centering
+\caption{Risk analysis for the Pralax project.}
+\label{tab:risks}
+\footnotesize
+\renewcommand{\arraystretch}{1.2}
+\begin{tabularx}{\textwidth}{c L L c L}
+\toprule
+\textbf{\#} & \textbf{Risk} & \textbf{Impact} & \textbf{Likelihood} & \textbf{Mitigation} \\
+\midrule
+R1 & Eye tracking fails in poor lighting or with glasses & High: the core feature is unusable for affected users & M & Calibration wizard; lighting guidance in the UI; accuracy task T2.10; head-position fallback (needs less image quality than the eyes); MediaPipe selected for robustness \\
+R2 & Latency spikes and jitter from camera to screen & High: the parallax feels laggy and can cause discomfort & M & Latency budget $\leq$50\,ms enforced in T2.5 and T3.2; EMA smoothing; threaded pipeline; T2.13 harness detects regressions early \\
+R3 & Tauri sidecar IPC bottleneck or insecurity & Medium: integration delay or an exposed local service & M & The bridge is the first phase-2 task (T2.1, early spike); localhost-only bindings; JSON schema validation; CI tests (T2.9) \\
+R4 & Blender export issues (materials, cameras, colours) & Medium: scenes render incorrectly, weak visual quality & H & Already observed in phase 1; export checklist and dedicated fix task T2.3; glTF validation; early render test T2.2 \\
+R5 & Scope creep in the 3D scenes and extra modes & High: missed milestones & M & MoSCoW backlog frozen at phase-2 start; PM reviews scope weekly; stretch items only after M2 \\
+R6 & Team member illness or absence & Medium: task delays and deadline pressure & M & Paired task ownership; buffer weeks before each milestone; Max (PM) reallocates at the weekly meetings; shared repository and docs \\
+R7 & Examiner hardware limitations (weak GPU, no webcam) & High: the demo cannot be shown or runs poorly & M & HTML/CSS layered fallback needs no GPU; quality settings; benchmark on a minimum-spec machine (T3.2); mouse-driven and no-camera fallback modes \\
+R8 & Webcam access and permissions differ across OSes & Medium: the app fails on some systems & M & Cross-platform test early in phase 2; permission-request UX; no-camera fallback demo mode \\
+R9 & User-study recruitment during the holiday period & Low: fewer or weaker feedback results & M & Sessions scheduled before the break (Nov 30--Dec 19); remote testing via the hosted demo (T3.4); backup participant list \\
+R10 & Demo or hosting failure at the final assessment & High: poor grade & L & Host the browser demo early (T3.4); offline desktop build as fallback; rehearsed demo with backup plan (T3.7); screen recording as a last resort \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \end{document}
