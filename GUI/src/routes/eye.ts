@@ -1,9 +1,9 @@
 import { writable } from "svelte/store";
 
 export interface EyeEvent {
-	x: number; // normalised eye offset, -1..1 (reference-relative)
+	x: number; //normalised eye offset, -1..1 (reference-relative)
 	y: number;
-	t: number; // server timestamp, ms
+	t: number; //server timestamp, ms
 	source: "synthetic" | "camera";
 	connected: boolean;
 }
@@ -18,10 +18,6 @@ export const eye = writable<EyeEvent>({
 	connected: false
 });
 
-/**
- * Poll the Python bridge (FaceTracking/bridge.py) and keep the `eye` store
- * up to date. Returns a stop function to cancel the polling.
- */
 export function startEyePolling(intervalMs = 50): () => void {
 	let stopped = false;
 

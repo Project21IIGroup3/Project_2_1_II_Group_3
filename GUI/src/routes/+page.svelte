@@ -12,7 +12,7 @@
 
 	let settings = $state<ParallaxSettings>({ intensity: 0.5, depth: 20, smoothing: 0.1 });
 
-	// Live eye offset streamed by the Python bridge (FaceTracking/bridge.py).
+	// live eye offset from the bridge
 	let eyeState = $state<EyeEvent>({ x: 0, y: 0, t: 0, source: "synthetic", connected: false });
 	$effect(() => {
 		return eye.subscribe((v) => { eyeState = v; });
@@ -22,8 +22,7 @@
 		return stop;
 	});
 
-	// EMA smoothing (settings.smoothing) and pixel offsets from intensity and
-	// depth - the same math as ParallaxMapper in the Python mapping module.
+	//EMA smoothing (alpha = the smoothing slider), then the pixel offset below.
 	let smoothed = $state({ x: 0, y: 0 });
 	$effect(() => {
 		const a = settings.smoothing;
@@ -31,13 +30,14 @@
 		smoothed.y = a * eyeState.y + (1 - a) * smoothed.y;
 	});
 
+	//10 = K_PX / layer_depth from parallax_mapping.py (500 / 50); single
+	//layer for now, per-layer offsets come with the 2.5D scenes.
 	let px = $derived(smoothed.x * settings.intensity * settings.depth * 10);
 	let py = $derived(smoothed.y * settings.intensity * settings.depth * 10);
 
 	function keyboard_swap(event: KeyboardEvent) {
 		switch (event.key) {
 			case "ArrowRight":
-				console.log("Clicked Arrow Right");
 				swap(1);
 				break;
 			case "ArrowLeft":

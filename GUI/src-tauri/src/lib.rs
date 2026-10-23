@@ -8,7 +8,6 @@ fn greet(name: &str) -> String {
 
 /// Start the Python bridge (tracking + parallax mapping) that serves the eye
 /// position on 127.0.0.1:8765. The child is returned so the shell can kill it
-/// when the app exits (sidecar lifecycle).
 fn spawn_bridge() -> Option<Child> {
     let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()? // GUI/src-tauri -> GUI

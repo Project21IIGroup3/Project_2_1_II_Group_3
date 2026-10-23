@@ -68,7 +68,7 @@
 		/>
 		<path d="M106 96 C120 76 180 76 194 96" stroke="#140d06" stroke-width="2.5" fill="none" opacity="0.55" />
 
-		<!-- eyes (no brows, famously) -->
+		<!-- eyes -->
 		<g fill="#3b2412">
 			<ellipse cx="135" cy="125" rx="7" ry="3" />
 			<ellipse cx="165" cy="125" rx="7" ry="3" />
@@ -91,7 +91,7 @@
 			opacity="0.7"
 		/>
 
-		<!-- the smile -->
+		<!-- mouth -->
 		<path d="M138 160 C145 164 155 164 162 159" stroke="#7a3f22" stroke-width="1.6" fill="none" stroke-linecap="round" />
 		<path d="M136 157.5 q1.5 2 3 2.3 M161 159 q1.5 -0.5 3 -2.5" stroke="#7a3f22" stroke-width="1" fill="none" opacity="0.6" />
 

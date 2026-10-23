@@ -20,7 +20,6 @@
 
 	let open = $state(true);
 
-	// Connection status of the Python bridge, shown in the overlay.
 	let eyeState = $state<EyeEvent>({ x: 0, y: 0, t: 0, source: "synthetic", connected: false });
 	$effect(() => {
 		return eye.subscribe((v) => { eyeState = v; });
