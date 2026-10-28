@@ -12,13 +12,13 @@
 	let container: HTMLDivElement;
 
 	onMount(() => {
-		// --- Renderer ---
+		// Renderer 
 		const renderer = new THREE.WebGLRenderer({ antialias: true });
 		renderer.setPixelRatio(window.devicePixelRatio);
 		renderer.outputColorSpace = THREE.SRGBColorSpace;
 		container.appendChild(renderer.domElement);
 
-		// --- Scene + lights (Blender lights often don't carry over well) ---
+		// Scene
 		const scene = new THREE.Scene();
 		scene.add(new THREE.AmbientLight(0xffffff, 0.6));
 		const sun = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -27,26 +27,26 @@
 
 		const camera = new THREE.PerspectiveCamera();
 
-		// --- The "window": the physical screen, centred at the origin on the z = 0 plane ---
+		// The "window": the physical screen, centred at the origin on the z = 0 plane
 		let screenH = settings.depth * 0.8;
 		let screenW = screenH;
 
-		// --- Load the Blender model and fit it just behind the screen ---
+		//  Load the Blender model and fit it just behind the screen 
 		new GLTFLoader().load(
 			MODEL_PATH,
 			(gltf) => {
 				const model = gltf.scene;
 				const box = new THREE.Box3().setFromObject(model);
 				const size = box.getSize(new THREE.Vector3());
-				const scale = (screenH * 1.2) / Math.max(size.x, size.y);
+				const scale = (screenH * 1.3) / Math.max(size.x, size.y);
 				model.scale.setScalar(scale);
 
 				// Re-measure after scaling, then centre in x/y and push the front face to z = 0
 				box.setFromObject(model);
 				const center = box.getCenter(new THREE.Vector3());
-				model.position.x -= center.x;
-				model.position.y -= center.y - 200;
-				model.position.z -= box.max.z;
+				model.position.x -= center.x + 5;
+				model.position.y -= center.y - 1;
+				model.position.z -= box.max.z - 22;
 
 				scene.add(model);
 			},
@@ -54,7 +54,7 @@
 			(err) => console.error(`Could not load ${MODEL_PATH}`, err)
 		);
 
-		// --- Eye position ---
+		// Eye position 
 		// TEMPORARY: the mouse stands in for the viewer's eye.
 		// When eye tracking is ready, set target.x / target.y / target.z from it instead.
 		const target = new THREE.Vector3(0, 0, settings.depth);
@@ -63,12 +63,12 @@
 		function onMouseMove(e: MouseEvent) {
 			const nx = (e.clientX / window.innerWidth) * 2 - 1; // -1 (left) .. 1 (right)
 			const ny = 1 - (e.clientY / window.innerHeight) * 2; // -1 (bottom) .. 1 (top)
-			target.x = nx * screenW * settings.intensity;
-			target.y = ny * screenH * settings.intensity;
+			target.x = nx * screenW * settings.intensity * 0.2;
+			target.y = ny * screenH * settings.intensity * 0.2;
 		}
 		window.addEventListener("mousemove", onMouseMove);
 
-		// --- Keep the canvas the size of its container ---
+		// Keep the canvas the size of its container 
 		function resize() {
 			const w = container.clientWidth;
 			const h = container.clientHeight;
@@ -80,7 +80,7 @@
 		observer.observe(container);
 		resize();
 
-		// --- Off-axis projection, recalculated every frame ---
+		//Off-axis projection
 		const NEAR = 0.1;
 		const FAR = 1000;
 		let frame = 0;
@@ -106,7 +106,7 @@
 		}
 		render();
 
-		// --- Clean up when the component is removed ---
+		//  Clean up when the component is removed 
 		return () => {
 			cancelAnimationFrame(frame);
 			observer.disconnect();

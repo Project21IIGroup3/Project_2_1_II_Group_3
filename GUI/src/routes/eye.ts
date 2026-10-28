@@ -18,7 +18,7 @@ export const eye = writable<EyeEvent>({
 	connected: false
 });
 
-export function startEyePolling(intervalMs = 50): () => void {
+export function startEyePolling(intervalMs = 0): () => void {
 	let stopped = false;
 
 	async function poll() {

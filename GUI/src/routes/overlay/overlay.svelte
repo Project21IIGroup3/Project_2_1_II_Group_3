@@ -12,8 +12,8 @@
 	import { eye, type EyeEvent } from "../eye";
 
 	interface Props {
-		swap: (direction: 1 | -1) => void;
-		settings: ParallaxSettings;
+		/*swap: (direction: 1 | -1) => void;
+		settings: ParallaxSettings; */
 	}
 
 	let { swap, settings = $bindable() }: Props = $props();

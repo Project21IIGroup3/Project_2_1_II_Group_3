@@ -32,8 +32,10 @@
 
 	//10 = K_PX / layer_depth from parallax_mapping.py (500 / 50); single
 	//layer for now, per-layer offsets come with the 2.5D scenes.
-	let px = $derived(smoothed.x * settings.intensity * settings.depth * 10);
-	let py = $derived(smoothed.y * settings.intensity * settings.depth * 10);
+	//let px = $derived(smoothed.x * settings.intensity * settings.depth * 10);
+	//let py = $derived(smoothed.y * settings.intensity * settings.depth * 10);
+	let px = 0;
+	let py = 0;
 
 	function keyboard_swap(event: KeyboardEvent) {
 		switch (event.key) {
