@@ -46,5 +46,5 @@ pub fn run() {
         let _ = child.wait();
     }
 
-    result.expect("error while running tauri application");
+    //result.expect("error while running tauri application");
 }
