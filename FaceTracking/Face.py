@@ -2,6 +2,7 @@ import mediapipe as mp
 from mediapipe.tasks import python
 from mediapipe.tasks.python import vision
 from typing import cast
+from threading import *
 import cv2 as cv
 import numpy as np
 import time
@@ -9,7 +10,7 @@ from pathlib import Path
 import threading
 import time
 
-#Just a small setup for the face tracker, probably will have to change a lot to be able to implement it into the project
+
 
 BaseOptions = mp.tasks.BaseOptions
 FaceDetector = mp.tasks.vision.FaceDetector
@@ -26,13 +27,6 @@ def thread_function(options):
         
         cap = cv.VideoCapture(0)
 
-    
-
-        fourcc = cv.VideoWriter_fourcc(*'XVID')
-        out = cv.VideoWriter('output.avi', fourcc, 20.0, (640,  480))
-
-
-   
         if not cap.isOpened():
             print("Cannot open camera")
             exit()
@@ -45,6 +39,8 @@ def thread_function(options):
                 print("Can't receive frame (stream end?). Exiting ...")
                 break
         
+            frame = cv.flip(frame, 1)
+
             rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
             mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb) 
             detector.detect_async(mp_image, time.monotonic_ns() // 1_000_000)
@@ -60,20 +56,12 @@ def thread_function(options):
                                 (0, 255, 0), 2, 16)
                     for kp in detection.keypoints:
                         cv.circle(frame, (int(kp.x * w), int(kp.y * h)), 4, (0, 0, 255), -1)
-            '''
-
-
-            frame = cv.flip(frame, 1)
-        
-
-        
-            out.write(frame)
-
-        
+            
             if cv.waitKey(1) == ord('q'):
                 break
+            '''
+
         cap.release()
-        out.release()
         cv.destroyAllWindows()
         
 
@@ -89,16 +77,19 @@ def get_result():
 
 
 def start_tracking():  
-    CameraFlag = 1    
+    global CameraFlag
+    CameraFlag = 1   
     options = FaceDetectorOptions(
         base_options=BaseOptions(model_asset_path=str(MODEL_PATH)),
         running_mode=VisionRunningMode.LIVE_STREAM,
         result_callback=print_result)
 
     x = threading.Thread(target=thread_function, args=(options,))
+    x.daemon = True
     x.start() 
 
 def stop_tracking():
+    global CameraFlag
     CameraFlag = 0          
 
 if __name__ == "__main__":
