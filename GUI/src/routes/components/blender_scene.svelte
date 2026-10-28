@@ -5,14 +5,27 @@
 	import type { ParallaxSettings } from "../overlay/overlay.svelte";
 
 	// Settings come from the overlay sliders (passed in by +page.svelte).
-	let { settings = { intensity: 0.5, depth: 20, smoothing: 0.1 } }: { settings?: ParallaxSettings } = $props();
+	let { settings = { intensity: 0.5, depth: 60, smoothing: 0.5 } }: { settings?: ParallaxSettings } = $props();
 
 	const MODEL_PATH = "/models/porject_test.glb"; // must match the file name in static/models exactly
+
+	// Units are metres. The forest is ~9.5 model units across with ~2 unit trees,
+	// so x6 gives a ~57 m forest with ~12 m trees.
+	const MODEL_SCALE = 6;
+	// Where the viewer stands, in model units (before scaling): ground there is
+	// y = 0.15, so 0.42 puts the eye 1.6 m up, looking towards the rat at the origin.
+	// A Blender empty named "Spawn" overrides this.
+	const SPAWN = new THREE.Vector3(0, 0.42, 4);
+	const SPAWN_YAW = 0; // radians, turns the view around the spawn point
+
+	// The "window" is the physical monitor: ~30 cm tall, centred at the origin on z = 0
+	const SCREEN_H = 0.3;
+	const HEAD_RANGE = 0.25; // max head offset in metres when the mouse is at the edge
 
 	let container: HTMLDivElement;
 
 	onMount(() => {
-		// Renderer 
+		// Renderer
 		const renderer = new THREE.WebGLRenderer({ antialias: true });
 		renderer.setPixelRatio(window.devicePixelRatio);
 		renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -27,67 +40,80 @@
 
 		const camera = new THREE.PerspectiveCamera();
 
-		// The "window": the physical screen, centred at the origin on the z = 0 plane
-		let screenH = settings.depth * 0.8;
-		let screenW = screenH;
+		let zoom = 1;
+		let aspect = 1;
 
-		//  Load the Blender model and fit it just behind the screen 
+		//  Load the Blender model and move it so the spawn point sits at the window
 		new GLTFLoader().load(
 			MODEL_PATH,
 			(gltf) => {
 				const model = gltf.scene;
-				const box = new THREE.Box3().setFromObject(model);
-				const size = box.getSize(new THREE.Vector3());
-				const scale = (screenH * 1.3) / Math.max(size.x, size.y);
-				model.scale.setScalar(scale);
+				model.scale.setScalar(MODEL_SCALE);
 
-				// Re-measure after scaling, then centre in x/y and push the front face to z = 0
-				box.setFromObject(model);
-				const center = box.getCenter(new THREE.Vector3());
-				model.position.x -= center.x + 5;
-				model.position.y -= center.y - 1;
-				model.position.z -= box.max.z - 22;
+				const world = new THREE.Group(); // shifted so the spawn point is at the origin
+				const pivot = new THREE.Group(); // turns the world around the viewer
+				world.add(model);
+				pivot.add(world);
+				scene.add(pivot);
 
-				scene.add(model);
+				world.updateMatrixWorld(true);
+				const marker = model.getObjectByName("Spawn");
+				const spawn = marker
+					? marker.getWorldPosition(new THREE.Vector3())
+					: model.localToWorld(SPAWN.clone());
+				world.position.copy(spawn).negate();
+				pivot.rotation.y = SPAWN_YAW;
 			},
 			undefined,
 			(err) => console.error(`Could not load ${MODEL_PATH}`, err)
 		);
 
-		// Eye position 
-		// TEMPORARY: the mouse stands in for the viewer's eye.
-		// When eye tracking is ready, set target.x / target.y / target.z from it instead.
-		const target = new THREE.Vector3(0, 0, settings.depth);
+		// Eye position
+		// TEMPORARY: the mouse stands in for the viewer's head.
+		// When eye tracking is ready, set head.x / head.y (-1..1) from it instead.
+		const head = { x: 0, y: 0 };
+		const target = new THREE.Vector3(0, 0, settings.depth / 100);
 		const eye = target.clone();
 
 		function onMouseMove(e: MouseEvent) {
-			const nx = (e.clientX / window.innerWidth) * 2 - 1; // -1 (left) .. 1 (right)
-			const ny = 1 - (e.clientY / window.innerHeight) * 2; // -1 (bottom) .. 1 (top)
-			target.x = nx * screenW * settings.intensity * 0.2;
-			target.y = ny * screenH * settings.intensity * 0.2;
+			head.x = (e.clientX / window.innerWidth) * 2 - 1; // -1 (left) .. 1 (right)
+			head.y = 1 - (e.clientY / window.innerHeight) * 2; // -1 (bottom) .. 1 (top)
 		}
 		window.addEventListener("mousemove", onMouseMove);
 
-		// Keep the canvas the size of its container 
+		// Scroll scales the virtual window: smaller window = narrower view = zoom in
+		function onWheel(e: WheelEvent) {
+			zoom *= Math.exp(-e.deltaY * 0.001);
+			zoom = Math.min(Math.max(zoom, 0.3), 3);
+		}
+		container.addEventListener("wheel", onWheel, { passive: true });
+
+		// Keep the canvas the size of its container
 		function resize() {
 			const w = container.clientWidth;
 			const h = container.clientHeight;
 			renderer.setSize(w, h);
-			screenH = settings.depth * 0.8;
-			screenW = screenH * (w / h);
+			aspect = w / h;
 		}
 		const observer = new ResizeObserver(resize);
 		observer.observe(container);
 		resize();
 
 		//Off-axis projection
-		const NEAR = 0.1;
+		const NEAR = 0.01;
 		const FAR = 1000;
 		let frame = 0;
 
 		function render() {
-			target.z = settings.depth;
-			eye.lerp(target, settings.smoothing);
+			const screenH = SCREEN_H / zoom;
+			const screenW = screenH * aspect;
+
+			target.x = head.x * HEAD_RANGE * settings.intensity;
+			target.y = head.y * HEAD_RANGE * settings.intensity;
+			target.z = Math.max(settings.depth, 1) / 100; // slider is in cm
+
+			// smoothing 0 = follow instantly, 1 = very floaty
+			eye.lerp(target, Math.pow(0.02, settings.smoothing));
 
 			// Similar triangles: project the screen's edges onto the near plane, as seen from the eye
 			const k = NEAR / eye.z;
@@ -106,11 +132,12 @@
 		}
 		render();
 
-		//  Clean up when the component is removed 
+		//  Clean up when the component is removed
 		return () => {
 			cancelAnimationFrame(frame);
 			observer.disconnect();
 			window.removeEventListener("mousemove", onMouseMove);
+			container.removeEventListener("wheel", onWheel);
 			renderer.dispose();
 			renderer.domElement.remove();
 		};

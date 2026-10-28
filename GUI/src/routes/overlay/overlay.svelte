@@ -12,8 +12,8 @@
 	import { eye, type EyeEvent } from "../eye";
 
 	interface Props {
-		/*swap: (direction: 1 | -1) => void;
-		settings: ParallaxSettings; */
+		swap: (direction: 1 | -1) => void;
+		settings: ParallaxSettings; 
 	}
 
 	let { swap, settings = $bindable() }: Props = $props();
@@ -64,8 +64,8 @@
 				<input type="range" min="0" max="1" step="0.01" bind:value={settings.intensity} />
 			</label>
 			<label>
-				<span>Depth <output>{settings.depth}px</output></span>
-				<input type="range" min="0" max="100" step="1" bind:value={settings.depth} />
+				<span>Depth <output>{settings.depth} cm</output></span>
+				<input type="range" min="30" max="100" step="1" bind:value={settings.depth} />
 			</label>
 			<label>
 				<span>Smoothing <output>{settings.smoothing.toFixed(2)}</output></span>

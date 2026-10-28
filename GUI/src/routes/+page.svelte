@@ -10,7 +10,7 @@
 	let index = $state(0);
 	let current = $derived(loaders[index]());
 
-	let settings = $state<ParallaxSettings>({ intensity: 0.5, depth: 20, smoothing: 0.1 });
+	let settings = $state<ParallaxSettings>({ intensity: 0.5, depth: 60, smoothing: 0.5 });
 
 	// live eye offset from the bridge
 	let eyeState = $state<EyeEvent>({ x: 0, y: 0, t: 0, source: "synthetic", connected: false });
@@ -60,7 +60,7 @@
 <main class="container">
 	<div class="scene" style:transform={"translate(" + px + "px, " + py + "px)"}>
 		{#await current then mod}
-			<mod.default />
+			<mod.default {settings} />
 		{:catch err}
 			<p class="error"> failed to load component {err.message} </p>
 		{/await}

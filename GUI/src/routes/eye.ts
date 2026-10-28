@@ -1,9 +1,9 @@
 import { writable } from "svelte/store";
 
 export interface EyeEvent {
-	x: number; //normalised eye offset, -1..1 (reference-relative)
+	x: number; 
 	y: number;
-	t: number; //server timestamp, ms
+	t: number; 
 	source: "synthetic" | "camera";
 	connected: boolean;
 }
@@ -18,7 +18,7 @@ export const eye = writable<EyeEvent>({
 	connected: false
 });
 
-export function startEyePolling(intervalMs = 0): () => void {
+export function startEyePolling(intervalMs = 50): () => void {
 	let stopped = false;
 
 	async function poll() {
