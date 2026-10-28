@@ -1,2 +1,10 @@
-FaceTracking/output.avi
+node_modules/
+.svelte-kit/
+build/
+target/
+**/src-tauri/gen/
+
+.DS_Store
+
 __pycache__/
+FaceTracking/output.avi
