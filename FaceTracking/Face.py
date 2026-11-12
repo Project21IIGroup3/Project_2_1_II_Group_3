@@ -34,7 +34,7 @@ class FaceTracking:
     def get_result(self):
         return self.latest_result
 
-    def _thread_function(self, options):
+    def _face_detection(self, options):
         with FaceDetector.create_from_options(options) as detector:
             cap = cv.VideoCapture(self.camera_index)
             fourcc = cv.VideoWriter_fourcc(*'XVID')
@@ -82,7 +82,7 @@ class FaceTracking:
             running_mode=VisionRunningMode.LIVE_STREAM,
             result_callback=self._print_result)
 
-        self._thread = threading.Thread(target=self._thread_function, args=(options,))
+        self._thread = threading.Thread(target=self._face_detection, args=(options,))
         self._thread.start()
         return self
 
@@ -96,11 +96,6 @@ class FaceTracking:
         left_eye = detection.keypoints[0]
         right_eye = detection.keypoints[1]
         return ((left_eye.x + right_eye.x) / 2.0, (left_eye.y + right_eye.y) / 2.0)
-
-
-if __name__ == "__main__":
-    FaceTracking().start_tracking()
-
 
 class ParallaxMapper:
     def __init__(self, intensity: float = 0.5, depth: float = 20.0, smoothing: float = 0.1):
