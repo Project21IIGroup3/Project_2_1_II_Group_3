@@ -12,14 +12,10 @@ jobs:
 
     steps:
       - name: Check out the code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
 
       #The math tests only use the standard library, so mediapipe/opencv are
-      # deliberately NOT installed here, that keeps every push fast.
+      #deliberately NOT installed here, that keeps every push fast.
       - name: Run the math tests
-        run: python -m unittest discover -s FaceTracking -p "test_*.py" -v
+        run: python3 -m unittest discover -s FaceTracking -p "test_*.py" -v
