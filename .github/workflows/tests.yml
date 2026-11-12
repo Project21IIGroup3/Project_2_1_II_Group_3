@@ -1,0 +1,25 @@
+name: Tests
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  math-tests:
+    name: Math function tests
+    runs-on: self-hosted
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      #The math tests only use the standard library, so mediapipe/opencv are
+      # deliberately NOT installed here, that keeps every push fast.
+      - name: Run the math tests
+        run: python -m unittest discover -s FaceTracking -p "test_*.py" -v
