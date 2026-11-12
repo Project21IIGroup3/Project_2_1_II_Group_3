@@ -6,7 +6,7 @@ import math
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from Face import FaceTracking, ParallaxMapper, eye_midpoint
+from Face import FaceTracking, ParallaxMapper
 
 HOST = "127.0.0.1"
 PORT = 8765
@@ -24,7 +24,7 @@ class Bridge:
 
     def position(self):
         if self._face is not None:
-            midpoint = eye_midpoint(self._face.get_result())
+            midpoint = eye_midpoint(self._face)
             if midpoint is not None:
                 return midpoint, "camera"
         t = time.monotonic() - self._start

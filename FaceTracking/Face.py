@@ -86,6 +86,17 @@ class FaceTracking:
         self._thread.start()
         return self
 
+    def eye_midpoint(self) -> Optional[Tuple[float, float]]:
+        result = self.latest_result
+        if result is None or not getattr(result, "detections", None):
+            return None
+        detection = result.detections[0]
+        if len(detection.keypoints) < 2:
+            return None
+        left_eye = detection.keypoints[0]
+        right_eye = detection.keypoints[1]
+        return ((left_eye.x + right_eye.x) / 2.0, (left_eye.y + right_eye.y) / 2.0)
+
 
 if __name__ == "__main__":
     FaceTracking().start_tracking()
@@ -122,14 +133,3 @@ class ParallaxMapper:
     def layer_offset(self, layer_depth: float) -> Tuple[float, float]:
         scale = self.intensity * K_PX * self.depth / max(layer_depth, 1e-6)
         return (self._smoothed[0] * scale, self._smoothed[1] * scale)
-
-
-def eye_midpoint(result) -> Optional[Tuple[float, float]]:
-    if result is None or not getattr(result, "detections", None):
-        return None
-    detection = result.detections[0]
-    if len(detection.keypoints) < 2:
-        return None
-    left_eye = detection.keypoints[0]
-    right_eye = detection.keypoints[1]
-    return ((left_eye.x + right_eye.x) / 2.0, (left_eye.y + right_eye.y) / 2.0)
