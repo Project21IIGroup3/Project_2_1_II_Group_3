@@ -27,12 +27,9 @@ class FaceTracking:
         self.latest_result = None
         self._thread = None
 
-    def _print_result(self, result: FaceDetectorResult, output_image: mp.Image, timestamp_ms: int):
+    def _print_result(self, result: FaceDetectorResult):
         print('face detector result: {}'.format(result))
         self.latest_result = result
-
-    def get_result(self):
-        return self.latest_result
 
     def _face_detection(self, options):
         with FaceDetector.create_from_options(options) as detector:
@@ -96,6 +93,18 @@ class FaceTracking:
         left_eye = detection.keypoints[0]
         right_eye = detection.keypoints[1]
         return ((left_eye.x + right_eye.x) / 2.0, (left_eye.y + right_eye.y) / 2.0)
+
+    def get_result(self):
+        return self.latest_result
+    
+    def get_camera_index(self):
+        return self.camera_index
+    
+    def get_output_path(self):
+        return str(Path(self.output_path).expanduser().resolve())
+    
+    def get_fps(self):
+        return self.fps
 
 class ParallaxMapper:
     def __init__(self, intensity: float = 0.5, depth: float = 20.0, smoothing: float = 0.1):

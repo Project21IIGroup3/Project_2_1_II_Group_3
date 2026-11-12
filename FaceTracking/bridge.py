@@ -24,7 +24,7 @@ class Bridge:
 
     def position(self):
         if self._face is not None:
-            midpoint = eye_midpoint(self._face)
+            midpoint = self._face.eye_midpoint()
             if midpoint is not None:
                 return midpoint, "camera"
         t = time.monotonic() - self._start
