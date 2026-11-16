@@ -27,7 +27,7 @@ class FaceTracking:
         self.latest_result = None
         self._thread = None
 
-    def _print_result(self, result: FaceDetectorResult):
+    def _print_result(self, result: FaceDetectorResult, _output_image: mp.Image, _timestamp_ms: int, ) -> None:
         print('face detector result: {}'.format(result))
         self.latest_result = result
 
