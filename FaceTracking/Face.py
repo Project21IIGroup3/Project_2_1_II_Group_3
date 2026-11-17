@@ -3,16 +3,8 @@ import threading
 import time
 from pathlib import Path
 
-import cv2 as cv
-import mediapipe as mp
-
 #Just a small setup for the face tracker, probably will have to change a lot to be able to implement it into the project
 
-BaseOptions = mp.tasks.BaseOptions
-FaceDetector = mp.tasks.vision.FaceDetector
-FaceDetectorOptions = mp.tasks.vision.FaceDetectorOptions
-FaceDetectorResult = mp.tasks.vision.FaceDetectorResult
-VisionRunningMode = mp.tasks.vision.RunningMode
 MODEL_PATH = Path(__file__).resolve().with_name('blaze_face_short_range.tflite')
 K_PX = 500.0
 
@@ -23,12 +15,16 @@ class FaceTracking:
         self.fps = fps
         self.latest_result = None
 
-    def _print_result(self, result: FaceDetectorResult, _output_image: mp.Image, _timestamp_ms: int, ) -> None:
+    def _print_result(self, result, _output_image, _timestamp_ms):
         print(f'face detector result: {result}')
         self.latest_result = result
 
     def _face_detection(self, options):
-        with FaceDetector.create_from_options(options) as detector:
+        import cv2 as cv
+        import mediapipe as mp
+        from mediapipe.tasks.python import vision
+
+        with vision.FaceDetector.create_from_options(options) as detector:
             cap = cv.VideoCapture(self.camera_index)
             fourcc = cv.VideoWriter_fourcc(*'XVID')
             out = cv.VideoWriter(self.output_path, fourcc, self.fps, (640, 480))
@@ -58,9 +54,12 @@ class FaceTracking:
             cv.destroyAllWindows()
 
     def start_tracking(self):
-        options = FaceDetectorOptions(
-            base_options=BaseOptions(model_asset_path=str(MODEL_PATH)),
-            running_mode=VisionRunningMode.LIVE_STREAM,
+        import mediapipe as mp
+        from mediapipe.tasks.python import vision
+
+        options = vision.FaceDetectorOptions(
+            base_options=mp.tasks.BaseOptions(model_asset_path=str(MODEL_PATH)),
+            running_mode=vision.RunningMode.LIVE_STREAM,
             result_callback=self._print_result)
 
         thread = threading.Thread(target=self._face_detection, args=(options,))
@@ -80,10 +79,10 @@ class FaceTracking:
 
     def get_camera_index(self):
         return self.camera_index
-    
+
     def get_output_path(self):
         return str(Path(self.output_path).expanduser().resolve())
-    
+
     def get_fps(self):
         return self.fps
 
