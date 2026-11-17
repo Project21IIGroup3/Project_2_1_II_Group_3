@@ -14,24 +14,24 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v5
 
-      #Face.py imports mediapipe/cv2 lazily (camera mode only), so the tests only need websockets; everything is pinned in requirements.txt so the full stack is ready for data collection. The runner's python3 may have no pip, so bootstrap it with get-pip.py, then install into the user site.
-      - name: Install Python dependencies
+      #Tools are installed once on the runner machine with scripts/setup-runner.sh; this just fails fast with a pointer to that script if something is missing.
+      - name: Check runner setup
         run: |
-          python3 -m pip --version 2>/dev/null || curl -sS https://bootstrap.pypa.io/get-pip.py | python3 - --user
-          python3 -m pip install --user -r FaceTracking/requirements.txt || python3 -m pip install --user --break-system-packages -r FaceTracking/requirements.txt
+          missing=""
+          for cmd in python3 pnpm cargo pkg-config curl; do
+            command -v "$cmd" >/dev/null 2>&1 || missing="$missing $cmd"
+          done
+          python3 -c "import importlib.util, sys; sys.exit(0 if all(importlib.util.find_spec(p) for p in ('mediapipe', 'cv2', 'websockets')) else 1)" || missing="$missing python-packages"
+          pkg-config --exists javascriptcoregtk-4.1 || missing="$missing webkitgtk-devel"
+          if [ -n "$missing" ]; then
+            echo "Missing on the runner:$missing"
+            echo "Run scripts/setup-runner.sh once on the runner machine."
+            exit 1
+          fi
+          echo "Runner setup OK"
 
       - name: Run Python tests (math, tracker, bridge)
         run: python3 -m unittest discover -s FaceTracking -p "test_*.py" -v
-
-      - name: Install pnpm
-        run: |
-          mkdir -p "$HOME/bin"
-          if [ ! -x "$HOME/bin/pnpm" ]; then
-            curl -fsSL https://github.com/pnpm/pnpm/releases/download/v12.10.1/pnpm-linux-x64.tar.gz -o "$HOME/bin/pnpm.tar.gz"
-            tar -xzf "$HOME/bin/pnpm.tar.gz" -C "$HOME/bin"
-            rm "$HOME/bin/pnpm.tar.gz"
-          fi
-          echo "$HOME/bin" >> "$GITHUB_PATH"
 
       - name: Install GUI dependencies
         working-directory: GUI
@@ -51,8 +51,11 @@ jobs:
           mkdir -p GUI/build
           printf '<!doctype html><html><body></body></html>\n' > GUI/build/index.html
 
+      #CARGO_TARGET_DIR lives in $HOME because actions/checkout git-cleans the workspace (including target/) on every run, which would force a full rebuild each commit.
       - name: Run Rust tests (shell spawns the bridge)
         working-directory: GUI/src-tauri
-        run: cargo test
+        run: |
+          export CARGO_TARGET_DIR="$HOME/.cargo-target"
+          cargo test
 
       #Do Data Collection later
