@@ -67,7 +67,7 @@ class WebSocketEndToEndTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         if not _port_free():
             self.skipTest(f"{HOST}:{PORT} is in use - a bridge is already running")
-        self.proc = subprocess.Popen(
+        self.proc = subprocess.Popen(  #noqa: ASYNC220 - spawn only, does not block
             [sys.executable, "bridge.py"],
             cwd=FACETRACKING_DIR,
             stdout=subprocess.PIPE,
@@ -97,7 +97,7 @@ class WebSocketEndToEndTests(unittest.IsolatedAsyncioTestCase):
                 return await asyncio.wait_for(
                     connect(f"ws://{HOST}:{PORT}", proxy=None), 1.0
                 )
-            except (OSError, asyncio.TimeoutError) as e:
+            except (TimeoutError, OSError) as e:
                 last_error = e
                 await asyncio.sleep(0.25)
         self.fail(f"could not connect to the bridge: {last_error}")

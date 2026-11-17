@@ -5,9 +5,9 @@ import asyncio
 import json
 import math
 import time
-from websockets.asyncio.server import broadcast, serve
 
 from Face import FaceTracking, ParallaxMapper
+from websockets.asyncio.server import broadcast, serve
 
 HOST = "127.0.0.1"
 PORT = 8765

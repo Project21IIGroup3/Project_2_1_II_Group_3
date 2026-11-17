@@ -14,11 +14,11 @@ jobs:
       - name: Check out the code
         uses: actions/checkout@v5
 
-      #The Python tests import Face.py, which needs mediapipe; the bridge and also needs websockets. Everything is pinned in requirements.txt.
+      #The Python tests import Face.py, which needs mediapipe; the bridge and also needs websockets. Everything is pinned in requirements.txt. The runner's python3 may have no pip, so bootstrap it with get-pip.py, then install into the user site.
       - name: Install Python dependencies
         run: |
-          python3 -m pip install --upgrade pip
-          python3 -m pip install -r FaceTracking/requirements.txt
+          python3 -m pip --version 2>/dev/null || curl -sS https://bootstrap.pypa.io/get-pip.py | python3 - --user
+          python3 -m pip install --user -r FaceTracking/requirements.txt || python3 -m pip install --user --break-system-packages -r FaceTracking/requirements.txt
 
       - name: Run Python tests (math, tracker, bridge)
         run: python3 -m unittest discover -s FaceTracking -p "test_*.py" -v

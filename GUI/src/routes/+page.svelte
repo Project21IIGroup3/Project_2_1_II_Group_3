@@ -2,7 +2,7 @@
     import type { Component } from "svelte";
 	import "../styles/landing.css"
 	import Overlay, { type ParallaxSettings } from "./overlay/overlay.svelte";
-	import { eye, connectEye, type EyeEvent } from "./eye";
+	import { connectEye } from "./eye";
 
 	const modules = import.meta.glob<{default: Component}>('./components/*.svelte');
 	const loaders = Object.values(modules);
@@ -12,30 +12,11 @@
 
 	let settings = $state<ParallaxSettings>({ intensity: 0.5, depth: 60, smoothing: 0.5 });
 
-	//live eye offset from the bridge
-	let eyeState = $state<EyeEvent>({ x: 0, y: 0, t: 0, source: "synthetic", tracking: false, connected: false });
-	$effect(() => {
-		return eye.subscribe((v) => { eyeState = v; });
-	});
+	//start the eye bridge on mount, disconnect when the component is removed
 	$effect(() => {
 		const stop = connectEye();
 		return stop;
 	});
-
-	//EMA smoothing (alpha = the smoothing slider), then the pixel offset below.
-	let smoothed = $state({ x: 0, y: 0 });
-	$effect(() => {
-		const a = settings.smoothing;
-		smoothed.x = a * eyeState.x + (1 - a) * smoothed.x;
-		smoothed.y = a * eyeState.y + (1 - a) * smoothed.y;
-	});
-
-	//10 = K_PX / layer_depth from parallax_mapping.py (500 / 50); single
-	//layer for now, per-layer offsets come with the 2.5D scenes.
-	//let px = $derived(smoothed.x * settings.intensity * settings.depth * 10);
-	//let py = $derived(smoothed.y * settings.intensity * settings.depth * 10);
-	let px = 0;
-	let py = 0;
 
 	function keyboard_swap(event: KeyboardEvent) {
 		switch (event.key) {
@@ -43,7 +24,6 @@
 				swap(1);
 				break;
 			case "ArrowLeft":
-				console.log("Clicked Arrow Left");
 				swap(-1);
 				break;
 			default:
@@ -58,7 +38,7 @@
 </script>
 
 <main class="container">
-	<div class="scene" style:transform={"translate(" + px + "px, " + py + "px)"}>
+	<div class="scene">
 		{#await current then mod}
 			<mod.default {settings} />
 		{:catch err}

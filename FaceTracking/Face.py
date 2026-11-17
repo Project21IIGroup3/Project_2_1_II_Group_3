@@ -1,13 +1,10 @@
-import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
-from typing import Any, cast
-import cv2 as cv
-import numpy as np
+import sys
+import threading
 import time
 from pathlib import Path
-import threading
-from typing import Optional, Tuple
+
+import cv2 as cv
+import mediapipe as mp
 
 #Just a small setup for the face tracker, probably will have to change a lot to be able to implement it into the project
 
@@ -25,10 +22,9 @@ class FaceTracking:
         self.output_path = output_path
         self.fps = fps
         self.latest_result = None
-        self._thread = None
 
     def _print_result(self, result: FaceDetectorResult, _output_image: mp.Image, _timestamp_ms: int, ) -> None:
-        print('face detector result: {}'.format(result))
+        print(f'face detector result: {result}')
         self.latest_result = result
 
     def _face_detection(self, options):
@@ -39,7 +35,7 @@ class FaceTracking:
 
             if not cap.isOpened():
                 print("Cannot open camera")
-                exit()
+                sys.exit()
 
             while cap.isOpened():
                 ret, frame = cap.read()
@@ -50,18 +46,6 @@ class FaceTracking:
                 rgb = cv.cvtColor(frame, cv.COLOR_BGR2RGB)
                 mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
                 detector.detect_async(mp_image, time.monotonic_ns() // 1_000_000)
-
-                ''' __________ This is for drawing the vertex points on the camera, not needed for the actual project _______
-                if self.latest_result is not None:
-                    h, w = frame.shape[:2]
-                    for detection in self.latest_result.detections:
-                        bbox = detection.bounding_box
-                        cv.rectangle(frame, (bbox.origin_x, bbox.origin_y),
-                                    (bbox.origin_x + bbox.width, bbox.origin_y + bbox.height),
-                                    (0, 255, 0), 2, 16)
-                        for kp in detection.keypoints:
-                            cv.circle(frame, (int(kp.x * w), int(kp.y * h)), 4, (0, 0, 255), -1)
-                '''
 
                 frame = cv.flip(frame, 1)
                 out.write(frame)
@@ -79,11 +63,11 @@ class FaceTracking:
             running_mode=VisionRunningMode.LIVE_STREAM,
             result_callback=self._print_result)
 
-        self._thread = threading.Thread(target=self._face_detection, args=(options,))
-        self._thread.start()
+        thread = threading.Thread(target=self._face_detection, args=(options,))
+        thread.start()
         return self
 
-    def eye_midpoint(self) -> Optional[Tuple[float, float]]:
+    def eye_midpoint(self) -> tuple[float, float] | None:
         result = self.latest_result
         if result is None or not getattr(result, "detections", None):
             return None
@@ -94,9 +78,6 @@ class FaceTracking:
         right_eye = detection.keypoints[1]
         return ((left_eye.x + right_eye.x) / 2.0, (left_eye.y + right_eye.y) / 2.0)
 
-    def get_result(self):
-        return self.latest_result
-    
     def get_camera_index(self):
         return self.camera_index
     
@@ -111,21 +92,21 @@ class ParallaxMapper:
         self.intensity = intensity  #overall effect strength
         self.depth = depth  #reference depth in px
         self.smoothing = smoothing  #EMA factor alpha
-        self._reference: Optional[Tuple[float, float]] = None  #neutral position
-        self._smoothed: Tuple[float, float] = (0.0, 0.0)  #last smoothed offset
+        self._reference: tuple[float, float] | None = None  #neutral position
+        self._smoothed: tuple[float, float] = (0.0, 0.0)  #last smoothed offset
 
-    def calibrate(self, position: Tuple[float, float]):
+    def calibrate(self, position: tuple[float, float]):
         self._reference = position
         self._smoothed = (0.0, 0.0)
 
-    def normalized(self, position: Tuple[float, float]) -> Tuple[float, float]:
+    def normalized(self, position: tuple[float, float]) -> tuple[float, float]:
         if self._reference is None:
             self.calibrate(position)
         dx = position[0] - self._reference[0]
         dy = position[1] - self._reference[1]
         return (max(-1.0, min(1.0, dx)), max(-1.0, min(1.0, dy)))
 
-    def update(self, position: Tuple[float, float]) -> Tuple[float, float]:
+    def update(self, position: tuple[float, float]) -> tuple[float, float]:
         dx, dy = self.normalized(position)
         a = self.smoothing
         self._smoothed = (
@@ -134,6 +115,6 @@ class ParallaxMapper:
         )
         return self._smoothed
 
-    def layer_offset(self, layer_depth: float) -> Tuple[float, float]:
+    def layer_offset(self, layer_depth: float) -> tuple[float, float]:
         scale = self.intensity * K_PX * self.depth / max(layer_depth, 1e-6)
         return (self._smoothed[0] * scale, self._smoothed[1] * scale)

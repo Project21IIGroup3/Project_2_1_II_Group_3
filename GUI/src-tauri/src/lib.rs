@@ -1,13 +1,7 @@
 use std::process::{Child, Command};
 
-// Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-#[tauri::command]
-fn greet(name: &str) -> String {
-    format!("Hello, {}! You've been greeted from Rust!", name)
-}
-
-/// Start the Python bridge (tracking + parallax mapping) that serves the eye
-/// position on 127.0.0.1:8765. The child is returned so the shell can kill it
+//Start the Python bridge (tracking + parallax mapping) that serves the eye
+//position on 127.0.0.1:8765. The child is returned so the shell can kill it
 fn spawn_bridge() -> Option<Child> {
     let script = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()? // GUI/src-tauri -> GUI
@@ -34,19 +28,16 @@ pub fn run() {
 
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .invoke_handler(tauri::generate_handler![greet])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 
-    let result = app.run(|_, _| {});
+    let _ = app.run(|_, _| {});
 
-    // Sidecar lifecycle: stop the bridge when the app exits.
+    //Sidecar lifecycle: stop the bridge when the app exits.
     if let Some(mut child) = bridge.take() {
         let _ = child.kill();
         let _ = child.wait();
     }
-
-    //result.expect("error while running tauri application");
 }
 
 #[cfg(test)]
@@ -54,14 +45,6 @@ mod tests {
     use super::*;
     use std::net::TcpStream;
     use std::time::{Duration, Instant};
-
-    #[test]
-    fn greet_includes_the_name() {
-        assert_eq!(
-            greet("pralax"),
-            "Hello, pralax! You've been greeted from Rust!"
-        );
-    }
 
     //The shell's whole job is to spawn a working bridge: the process must
     //start and serve its websocket on 127.0.0.1:8765. When no python is

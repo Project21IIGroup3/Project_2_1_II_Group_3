@@ -2,6 +2,7 @@ import unittest
 
 from Face import FaceTracking
 
+
 class _Keypoint:
     def __init__(self, x, y):
         self.x = x
