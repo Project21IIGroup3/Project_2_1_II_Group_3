@@ -1,10 +1,11 @@
 """HTTP bridge between the face tracker and the GUI."""
 
 import argparse
+import asyncio
 import json
 import math
 import time
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from websockets.asyncio.server import broadcast, serve
 
 from parallax_mapping import ParallaxMapper, eye_midpoint
 
@@ -13,6 +14,7 @@ PORT = 8765
 
 class Bridge:
     def __init__(self, use_camera: bool):
+        self._last = (0.5,0.5)
         self.mapper = ParallaxMapper()
         self.use_camera = use_camera
         self._start = time.monotonic()
@@ -27,73 +29,65 @@ class Bridge:
         if self._face is not None:
             midpoint = eye_midpoint(self._face.get_result())
             if midpoint is not None:
-                return midpoint, "camera"
+                self._last = midpoint
+                return midpoint, "camera", True
+            else:
+                return self._last, "camera", False
         t = time.monotonic() - self._start
         x = 0.5 + 0.3 * math.sin(0.5 * t)
         y = 0.5 + 0.2 * math.sin(0.23 * t + 1.0)
-        return (x, y), "synthetic"
+        return (x, y), "Test/No Camera", False
 
     def event(self):
-        position, source = self.position()
+        position, source, camera_check = self.position()
         x, y = self.mapper.normalized(position)
-        return {"x": x, "y": y, "t": int(time.time() * 1000), "source": source}
+        return {"x": -x, "y": -y, "t": int(time.time() * 1000), "source": source, "camera_check": camera_check}
 
     def calibrate(self):
         position, _ = self.position()
         self.mapper.calibrate(position)
 
-class Handler(BaseHTTPRequestHandler):
-    bridge: Bridge = None  #set by main()
+bridge: Bridge = None
 
-    def _send_json(self, payload: dict, status: int = 200):
-        body = json.dumps(payload).encode("utf-8")
-        self.send_response(status)
-        self.send_header("Content-Type", "application/json")
-        self.send_header("Access-Control-Allow-Origin", "*")  #wouldnt work otherwise
-        self.send_header("Cache-Control", "no-store")
-        self.send_header("Content-Length", str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+async def handler(websocket):
+    async for message in websocket:
+        try:
+            data = json.loads(message)
+        except json.JSONDecodeError:
+            continue
+        if data.get("type") == "calibrate":
+            bridge.calibrate()
 
-    def do_GET(self):
-        if self.path == "/eye":
-            self._send_json(self.bridge.event())
-        else:
-            self._send_json({"error": "not found"}, status=404)
+async def broadcast_loop(server):
+    while True:
+        broadcast(server.connections, json.dumps(bridge.event()))
+        await asyncio.sleep(1 / 60)
 
-    def do_POST(self):
-        if self.path == "/calibrate":
-            self.bridge.calibrate()
-            self._send_json({"ok": True})
-        else:
-            self._send_json({"error": "not found"}, status=404)
-
-    def log_message(self, *args):
-        pass  #don't spam the console with request logs
-
-
-def main():
+async def main():
+    global bridge
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--camera", action="store_true",
                         help="use the webcam tracker instead of the synthetic sweep")
     args = parser.parse_args()
 
-    Handler.bridge = Bridge(use_camera=args.camera)
-    source = "webcam tracker" if args.camera else "synthetic sweep (no camera)"
+    bridge = Bridge(use_camera=args.camera)
 
-    try:
-        server = ThreadingHTTPServer((HOST, PORT), Handler)
+    source = "webcam tracker" if args.camera else "Testing/No Camera"
+
+    try:    
+        server = await serve(handler,HOST,PORT)
+        await server.serve_forever
     except OSError:
         print(f"{HOST}:{PORT} already in use - another bridge is running; exiting.")
         return
-
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        server.server_close()
-
+        
+    print(f"Bridge on ws://{HOST}:{PORT} using {source}", flush=True)
+    async with server:
+        asyncio.create_task(broadcast_loop(server))
+        await server.serve_forever()
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
