@@ -43,7 +43,7 @@ class Bridge:
         return {"x": -x, "y": -y, "t": int(time.time() * 1000), "source": source, "camera_check": camera_check}
 
     def calibrate(self):
-        position, _ = self.position()
+        position, _, _ = self.position()
         self.mapper.calibrate(position)
 
 bridge: Bridge = None
@@ -73,20 +73,16 @@ async def main():
 
     source = "webcam tracker" if args.camera else "Testing/No Camera"
 
-    try:    
-        server = await serve(handler,HOST,PORT)
-        await server.serve_forever
+    try:
+        async with serve(handler, HOST, PORT) as server:
+            print(f"Bridge on ws://{HOST}:{PORT} using {source}", flush=True)
+            asyncio.create_task(broadcast_loop(server))
+            await server.serve_forever()
     except OSError:
         print(f"{HOST}:{PORT} already in use - another bridge is running; exiting.")
-        return
-        
-    print(f"Bridge on ws://{HOST}:{PORT} using {source}", flush=True)
-    async with server:
-        asyncio.create_task(broadcast_loop(server))
-        await server.serve_forever()
 
 if __name__ == "__main__":
     try:
-        main()
+        asyncio.run(main())
     except KeyboardInterrupt:
         pass

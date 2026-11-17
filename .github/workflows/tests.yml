@@ -5,17 +5,44 @@ on:
   workflow_dispatch:
 
 jobs:
-  math-tests:
-    name: Math function tests
+  tests:
+    name: Full test suite
     runs-on: self-hosted
-    timeout-minutes: 10
+    timeout-minutes: 45
 
     steps:
       - name: Check out the code
         uses: actions/checkout@v5
 
+      #The Python tests import Face.py, which needs mediapipe; the bridge and also needs websockets. Everything is pinned in requirements.txt.
+      - name: Install Python dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          python3 -m pip install -r FaceTracking/requirements.txt
 
-      #The math tests only use the standard library, so mediapipe/opencv are
-      #deliberately NOT installed here, that keeps every push fast.
-      - name: Run the math tests
+      - name: Run Python tests (math, tracker, bridge)
         run: python3 -m unittest discover -s FaceTracking -p "test_*.py" -v
+
+      - name: Install GUI dependencies
+        working-directory: GUI
+        run: pnpm install
+
+      - name: Run frontend tests
+        working-directory: GUI
+        run: pnpm test
+
+      - name: Type-check the GUI
+        working-directory: GUI
+        run: pnpm check
+
+      #The tauri build script embeds frontendDist at compile time, so an index.html must exist there even for cargo test. build/ is gitignored.
+      - name: Prepare frontend dist stub
+        run: |
+          mkdir -p GUI/build
+          printf '<!doctype html><html><body></body></html>\n' > GUI/build/index.html
+
+      - name: Run Rust tests (shell spawns the bridge)
+        working-directory: GUI/src-tauri
+        run: cargo test
+
+      #Do Data Collection later

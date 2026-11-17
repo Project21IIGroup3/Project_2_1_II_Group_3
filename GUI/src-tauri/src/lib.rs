@@ -48,3 +48,53 @@ pub fn run() {
 
     //result.expect("error while running tauri application");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::TcpStream;
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn greet_includes_the_name() {
+        assert_eq!(
+            greet("pralax"),
+            "Hello, pralax! You've been greeted from Rust!"
+        );
+    }
+
+    //The shell's whole job is to spawn a working bridge: the process must
+    //start and serve its websocket on 127.0.0.1:8765. When no python is
+    //available the test skips, so pure-Rust environments still pass.
+    #[test]
+    fn spawn_bridge_starts_and_listens() {
+        let Some(child) = spawn_bridge() else {
+            eprintln!("skipping: no python3/python on PATH");
+            return;
+        };
+
+        //Reap the bridge even if the test fails midway.
+        struct ChildGuard(Child);
+        impl Drop for ChildGuard {
+            fn drop(&mut self) {
+                let _ = self.0.kill();
+                let _ = self.0.wait();
+            }
+        }
+        let mut child = ChildGuard(child);
+
+        let deadline = Instant::now() + Duration::from_secs(30);
+        loop {
+            if let Some(status) = child.0.try_wait().expect("try_wait on bridge child") {
+                panic!("bridge exited early with status {status}");
+            }
+            if TcpStream::connect(("127.0.0.1", 8765)).is_ok() {
+                break;
+            }
+            if Instant::now() > deadline {
+                panic!("bridge never started listening on 127.0.0.1:8765");
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        }
+    }
+}

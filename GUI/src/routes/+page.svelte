@@ -2,7 +2,7 @@
     import type { Component } from "svelte";
 	import "../styles/landing.css"
 	import Overlay, { type ParallaxSettings } from "./overlay/overlay.svelte";
-	import { eye, startEyePolling, type EyeEvent } from "./eye";
+	import { eye, connectEye, type EyeEvent } from "./eye";
 
 	const modules = import.meta.glob<{default: Component}>('./components/*.svelte');
 	const loaders = Object.values(modules);
@@ -12,13 +12,13 @@
 
 	let settings = $state<ParallaxSettings>({ intensity: 0.5, depth: 60, smoothing: 0.5 });
 
-	// live eye offset from the bridge
-	let eyeState = $state<EyeEvent>({ x: 0, y: 0, t: 0, source: "synthetic", connected: false });
+	//live eye offset from the bridge
+	let eyeState = $state<EyeEvent>({ x: 0, y: 0, t: 0, source: "synthetic", tracking: false, connected: false });
 	$effect(() => {
 		return eye.subscribe((v) => { eyeState = v; });
 	});
 	$effect(() => {
-		const stop = startEyePolling();
+		const stop = connectEye();
 		return stop;
 	});
 

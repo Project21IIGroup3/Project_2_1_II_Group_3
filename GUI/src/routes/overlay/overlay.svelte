@@ -20,7 +20,7 @@
 
 	let open = $state(true);
 
-	let eyeState = $state<EyeEvent>({ x: 0, y: 0, t: 0, source: "synthetic", connected: false });
+	let eyeState = $state<EyeEvent>({ x: 0, y: 0, t: 0, source: "synthetic", tracking: false, connected: false });
 	$effect(() => {
 		return eye.subscribe((v) => { eyeState = v; });
 	});

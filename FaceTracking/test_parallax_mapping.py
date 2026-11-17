@@ -1,23 +1,7 @@
 import math
 import unittest
 
-from parallax_mapping import K_PX, ParallaxMapper, eye_midpoint
-
-
-class _Keypoint:
-    def __init__(self, x, y):
-        self.x = x
-        self.y = y
-
-
-class _Detection:
-    def __init__(self, keypoints):
-        self.keypoints = keypoints
-
-
-class _Result:
-    def __init__(self, detections):
-        self.detections = detections
+from Face import K_PX, ParallaxMapper
 
 
 class ParallaxMapperCalibrationTests(unittest.TestCase):
@@ -78,7 +62,7 @@ class ParallaxMapperSmoothingTests(unittest.TestCase):
     def test_axes_are_independent(self):
         mapper = ParallaxMapper(smoothing=0.5)
         mapper.calibrate((0.5, 0.5))
-        x, y = mapper.update((0.7, 0.5))
+        x, y = mapper.update((0.7, 0.5)) #ove x only
         self.assertAlmostEqual(x, 0.1)
         self.assertAlmostEqual(y, 0.0)
 
@@ -87,7 +71,7 @@ class ParallaxMapperLayerOffsetTests(unittest.TestCase):
     def test_offset_scales_with_intensity_and_depth(self):
         mapper = ParallaxMapper(intensity=0.5, depth=20.0)
         mapper.calibrate((0.5, 0.5))
-        mapper.update((0.6, 0.5))
+        mapper.update((0.6, 0.5))  #smoothed x = 0.01 with default alpha
         scale = 0.5 * K_PX * 20.0 / 20.0
         x, y = mapper.layer_offset(20.0)
         self.assertAlmostEqual(x, 0.01 * scale)
@@ -113,30 +97,6 @@ class ParallaxMapperLayerOffsetTests(unittest.TestCase):
         offset = mapper.layer_offset(0.0)
         self.assertTrue(math.isfinite(offset[0]))
         self.assertTrue(math.isfinite(offset[1]))
-
-
-class EyeMidpointTests(unittest.TestCase):
-    def test_none_result_returns_none(self):
-        self.assertIsNone(eye_midpoint(None))
-
-    def test_no_detections_returns_none(self):
-        self.assertIsNone(eye_midpoint(_Result([])))
-
-    def test_too_few_keypoints_returns_none(self):
-        result = _Result([_Detection([_Keypoint(0.1, 0.2)])])
-        self.assertIsNone(eye_midpoint(result))
-
-    def test_midpoint_averages_the_eyes(self):
-        result = _Result(
-            [_Detection([_Keypoint(0.1, 0.2), _Keypoint(0.3, 0.6)])]
-        )
-        self.assertEqual(eye_midpoint(result), (0.2, 0.4))
-
-    def test_first_detection_is_used(self):
-        first = _Detection([_Keypoint(0.1, 0.1), _Keypoint(0.3, 0.3)])
-        second = _Detection([_Keypoint(0.9, 0.9), _Keypoint(0.9, 0.9)])
-        result = _Result([first, second])
-        self.assertEqual(eye_midpoint(result), (0.2, 0.2))
 
 
 if __name__ == "__main__":
