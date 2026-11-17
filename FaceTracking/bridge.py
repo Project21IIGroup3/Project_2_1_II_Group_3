@@ -7,7 +7,7 @@ import math
 import time
 from websockets.asyncio.server import broadcast, serve
 
-from parallax_mapping import ParallaxMapper, eye_midpoint
+from Face import FaceTracking, ParallaxMapper
 
 HOST = "127.0.0.1"
 PORT = 8765
@@ -19,15 +19,14 @@ class Bridge:
         self.use_camera = use_camera
         self._start = time.monotonic()
         if use_camera:
-            import Face
-            self._face = Face
-            Face.start_tracking()
+            self._face = FaceTracking()
+            self._face.start_tracking()
         else:
             self._face = None
 
     def position(self):
         if self._face is not None:
-            midpoint = eye_midpoint(self._face.get_result())
+            midpoint = self._face.eye_midpoint()
             if midpoint is not None:
                 self._last = midpoint
                 return midpoint, "camera", True
